@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from learnit_study import auth, courses, downloader, flashcards, notes, parser
+from learnit_study import auth, courses, downloader, extraction, flashcards, notes, parser
 
 
 app = typer.Typer(help="Local-first study assistant for ITU LearnIT/Moodle.")
@@ -11,6 +11,7 @@ courses_app = typer.Typer(help="List LearnIT courses.")
 course_app = typer.Typer(help="Work with a selected LearnIT course.")
 notes_app = typer.Typer(help="Generate local study notes.")
 flashcards_app = typer.Typer(help="Generate flashcards.")
+text_app = typer.Typer(help="Extract text from downloaded course materials.")
 
 
 @auth_app.command("check")
@@ -112,6 +113,21 @@ def course_inspect(
         raise typer.Exit(1) from exc
 
 
+@text_app.command("extract")
+def text_extract(
+    course: str | None = typer.Option(None, "--course", help="LearnIT course id."),
+    out: str = typer.Option("output", "--out", help="Output directory containing downloaded courses."),
+    course_dir: str | None = typer.Option(None, "--course-dir", help="Exact downloaded course folder."),
+) -> None:
+    """Extract text from already-downloaded local course materials."""
+    try:
+        summary = extraction.extract_course_text(course=course, out=out, course_dir=course_dir)
+        typer.echo(extraction.format_summary(summary))
+    except extraction.ExtractionError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
+
+
 @notes_app.command("generate")
 def notes_generate(
     course: str = typer.Option(..., "--course", help="LearnIT course id."),
@@ -133,6 +149,7 @@ def flashcards_generate(
 app.add_typer(auth_app, name="auth")
 app.add_typer(courses_app, name="courses")
 app.add_typer(course_app, name="course")
+app.add_typer(text_app, name="text")
 app.add_typer(notes_app, name="notes")
 app.add_typer(flashcards_app, name="flashcards")
 

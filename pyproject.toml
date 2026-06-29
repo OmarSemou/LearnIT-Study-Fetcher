@@ -12,8 +12,11 @@ license = { text = "MIT" }
 authors = [{ name = "learnit-study-assistant contributors" }]
 dependencies = [
   "beautifulsoup4>=4.12",
+  "pypdf>=4.0",
   "pydantic>=2.0",
+  "python-docx>=1.1",
   "python-dotenv>=1.0",
+  "python-pptx>=0.6.23",
   "requests>=2.31",
   "typer>=0.12",
 ]
