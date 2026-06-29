@@ -11,16 +11,21 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "learnit-study-assistant contributors" }]
 dependencies = [
+  "beautifulsoup4>=4.12",
+  "pydantic>=2.0",
+  "python-dotenv>=1.0",
+  "requests>=2.31",
   "typer>=0.12",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
+  "typer>=0.12",
 ]
 
 [project.scripts]
-learnit-study = "learnit_study.cli:app"
+learnit-study = "learnit_study.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
