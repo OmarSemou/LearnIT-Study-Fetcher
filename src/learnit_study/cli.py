@@ -14,9 +14,19 @@ flashcards_app = typer.Typer(help="Generate flashcards.")
 
 
 @auth_app.command("check")
-def auth_check() -> None:
-    """Placeholder for checking whether a LearnIT cookie is available and valid."""
-    typer.echo(auth.check())
+def auth_check(
+    cookie: str | None = typer.Option(
+        None,
+        "--cookie",
+        help="LearnIT browser Cookie header value. Prefer cookie.txt or LEARNIT_COOKIE.",
+    ),
+) -> None:
+    """Check whether a LearnIT cookie is available and valid."""
+    try:
+        typer.echo(auth.check(cookie=cookie))
+    except auth.AuthError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
 
 
 @courses_app.command("list")
