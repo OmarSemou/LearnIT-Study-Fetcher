@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from typer.testing import CliRunner
 
-from learnit_study import auth, courses, parser
+from learnit_study import auth, courses, downloader, parser
 from learnit_study.cli import app
 
 
@@ -270,6 +270,29 @@ def test_course_inspect_real_like_output_uses_lecture_names_and_ignores_ui(
     assert "Lecture 9: Database Design Using Normalization" in result.output
     assert "Section 5 2" not in result.output
     assert "Collapse Expand" not in result.output
+
+
+def test_course_download_does_not_print_cookie(monkeypatch) -> None:
+    secret = "MoodleSession=super-secret"
+
+    def fake_download_course(course_id, out="output", delay=0.0, cookie=None):
+        assert cookie == secret
+        return downloader.DownloadSummary(
+            course_id=course_id,
+            output_dir=Path("output") / course_id,
+            files_downloaded=1,
+            files_skipped=0,
+            links_recorded=0,
+            unsupported_skipped=0,
+            failures=0,
+        )
+
+    monkeypatch.setattr(downloader, "download_course", fake_download_course)
+
+    result = runner.invoke(app, ["course", "download", "--course", "3025533", "--cookie", secret])
+
+    assert result.exit_code == 0
+    assert secret not in result.output
 
 
 def test_courses_list_include_non_courses_flag(monkeypatch) -> None:

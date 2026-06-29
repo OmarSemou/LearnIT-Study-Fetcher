@@ -78,9 +78,21 @@ def courses_list(
 @course_app.command("download")
 def course_download(
     course: str = typer.Option(..., "--course", help="LearnIT course id."),
+    out: str = typer.Option("output", "--out", help="Output directory for downloaded materials."),
+    delay: float = typer.Option(0.0, "--delay", help="Delay in seconds between activities."),
+    cookie: str | None = typer.Option(
+        None,
+        "--cookie",
+        help="LearnIT browser Cookie header value. Prefer cookie.txt or LEARNIT_COOKIE.",
+    ),
 ) -> None:
-    """Placeholder for downloading course materials."""
-    typer.echo(downloader.download_course(course_id=course))
+    """Download supported LearnIT course materials."""
+    try:
+        summary = downloader.download_course(course_id=course, out=out, delay=delay, cookie=cookie)
+        typer.echo(downloader.format_summary(summary))
+    except (auth.AuthError, parser.ParserError, downloader.DownloadError) as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
 
 
 @course_app.command("inspect")

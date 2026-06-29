@@ -68,6 +68,7 @@ class CourseSection:
 class CoursePage:
     course_id: str
     sections: list[CourseSection]
+    title: str | None = None
 
 
 def fetch_course_page_html(
@@ -149,7 +150,28 @@ def parse_course_page(
         for section_name, activities in grouped.items()
     ]
 
-    return CoursePage(course_id=course_id, sections=sections)
+    return CoursePage(course_id=course_id, sections=sections, title=extract_course_title(soup))
+
+
+def extract_course_title(soup: BeautifulSoup) -> str | None:
+    selectors = (
+        "main h1",
+        "#region-main h1",
+        "[role='main'] h1",
+        ".page-header-headings h1",
+        ".course-header h1",
+        "header h1",
+        "h1",
+    )
+    for selector in selectors:
+        node = soup.select_one(selector)
+        if node:
+            title = _clean_course_title(node.get_text(" ", strip=True))
+            if title:
+                return title
+    if soup.title:
+        return _clean_course_title(soup.title.get_text(" ", strip=True))
+    return None
 
 
 def format_course_page(course_page: CoursePage) -> str:
@@ -424,6 +446,16 @@ def _activity_type(url: str) -> str:
 
 def _normalize_space(value: str) -> str:
     return " ".join(value.split())
+
+
+def _clean_course_title(value: str) -> str | None:
+    title = _normalize_space(value)
+    if not title:
+        return None
+    title = re.sub(r"\s*\|\s*LearnIT\s*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s*-\s*LearnIT\s*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\s*:\s*LearnIT\s*$", "", title, flags=re.IGNORECASE)
+    return title or None
 
 
 def _child_section_nodes(section_node: Tag) -> list[Tag]:

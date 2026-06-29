@@ -16,10 +16,40 @@ def test_section_parsing() -> None:
     page = parser.parse_course_page(read_fixture("course_page.html"), course_id="3025489")
 
     assert page.course_id == "3025489"
+    assert page.title == "Database and Information Systems Foundations (Spring 2026)"
     assert [section.name for section in page.sections] == [
         "Week 1 - Intro",
         "Week 2 - Architecture",
     ]
+
+
+def test_course_title_falls_back_to_document_title() -> None:
+    page = parser.parse_course_page(
+        """
+        <html>
+          <head><title>Document Title Course | LearnIT</title></head>
+          <body>
+            <a href="/mod/resource/view.php?id=1"><span class="instancename">File</span></a>
+          </body>
+        </html>
+        """
+    )
+
+    assert page.title == "Document Title Course"
+
+
+def test_course_title_fallback_is_none_if_no_title_exists() -> None:
+    page = parser.parse_course_page(
+        """
+        <html>
+          <body>
+            <a href="/mod/resource/view.php?id=1"><span class="instancename">File</span></a>
+          </body>
+        </html>
+        """
+    )
+
+    assert page.title is None
 
 
 def test_activity_parsing() -> None:
