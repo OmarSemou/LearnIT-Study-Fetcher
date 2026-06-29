@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from typer.testing import CliRunner
 
-from learnit_study import auth, courses
+from learnit_study import auth, courses, parser
 from learnit_study.cli import app
 
 
@@ -140,6 +140,136 @@ def test_courses_list_help_mentions_current_default_and_all_courses() -> None:
     assert "StudyLab" in result.output
     assert "Show all enrolled" in result.output
     assert "including old" in result.output
+
+
+def test_course_inspect_output_contains_section_and_activity(monkeypatch) -> None:
+    monkeypatch.setattr(
+        parser,
+        "inspect_course",
+        lambda course_id, cookie=None: parser.CoursePage(
+            course_id=course_id,
+            sections=[
+                parser.CourseSection(
+                    name="Week 1 - Intro",
+                    activities=[
+                        parser.Activity(
+                            name="Lecture slides",
+                            type="file",
+                            cmid=101,
+                            url="https://learnit.itu.dk/mod/resource/view.php?id=101",
+                            section_name="Week 1 - Intro",
+                        )
+                    ],
+                )
+            ],
+        ),
+    )
+
+    result = runner.invoke(app, ["course", "inspect", "--course", "3025489"])
+
+    assert result.exit_code == 0
+    assert "Week 1 - Intro" in result.output
+    assert "Lecture slides" in result.output
+    assert "cmid=101" in result.output
+
+
+def test_course_inspect_nested_output_contains_lecture_activity_without_parent_stealing(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        parser,
+        "inspect_course",
+        lambda course_id, cookie=None: parser.CoursePage(
+            course_id=course_id,
+            sections=[
+                parser.CourseSection(
+                    name="1.Fundamentals of Information Systems",
+                    activities=[
+                        parser.Activity(
+                            name="Course overview",
+                            type="file",
+                            cmid=10,
+                            url="https://learnit.itu.dk/mod/resource/view.php?id=10",
+                            section_name="1.Fundamentals of Information Systems",
+                        )
+                    ],
+                ),
+                parser.CourseSection(
+                    name="Lecture 2: Information Systems in Global Business Today",
+                    activities=[
+                        parser.Activity(
+                            name="Laudon chapter PDF",
+                            type="file",
+                            cmid=21,
+                            url="https://learnit.itu.dk/mod/resource/view.php?id=21",
+                            section_name="Lecture 2: Information Systems in Global Business Today",
+                        )
+                    ],
+                ),
+                parser.CourseSection(
+                    name="Lecture 3: Information Systems, Organizations, and Strategy",
+                    activities=[],
+                ),
+            ],
+        ),
+    )
+
+    result = runner.invoke(app, ["course", "inspect", "--course", "3025533"])
+
+    assert result.exit_code == 0
+    assert "Lecture 2: Information Systems in Global Business Today" in result.output
+    assert "Laudon chapter PDF" in result.output
+    assert "Lecture 3: Information Systems, Organizations, and Strategy" not in result.output
+
+    parent_block = result.output.split("Lecture 2: Information Systems in Global Business Today")[0]
+    assert "1.Fundamentals of Information Systems" in parent_block
+    assert "Laudon chapter PDF" not in parent_block
+
+
+def test_course_inspect_real_like_output_uses_lecture_names_and_ignores_ui(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        parser,
+        "inspect_course",
+        lambda course_id, cookie=None: parser.CoursePage(
+            course_id=course_id,
+            sections=[
+                parser.CourseSection(
+                    name="Lecture 8: The Relational Model and Normalization",
+                    activities=[
+                        parser.Activity(
+                            name="Chapter 3 PDF",
+                            type="file",
+                            cmid=81,
+                            url="https://learnit.itu.dk/mod/resource/view.php?id=81",
+                            section_name="Lecture 8: The Relational Model and Normalization",
+                        )
+                    ],
+                ),
+                parser.CourseSection(
+                    name="Lecture 9: Database Design Using Normalization",
+                    activities=[
+                        parser.Activity(
+                            name="Chapter 4 PDF",
+                            type="file",
+                            cmid=91,
+                            url="https://learnit.itu.dk/mod/resource/view.php?id=91",
+                            section_name="Lecture 9: Database Design Using Normalization",
+                        )
+                    ],
+                ),
+            ],
+        ),
+    )
+
+    result = runner.invoke(app, ["course", "inspect", "--course", "3025533"])
+
+    assert result.exit_code == 0
+    assert "Lecture 8: The Relational Model and Normalization" in result.output
+    assert "Lecture 9: Database Design Using Normalization" in result.output
+    assert "Section 5 2" not in result.output
+    assert "Collapse Expand" not in result.output
 
 
 def test_courses_list_include_non_courses_flag(monkeypatch) -> None:

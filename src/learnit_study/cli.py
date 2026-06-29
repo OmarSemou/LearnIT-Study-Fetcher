@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from learnit_study import auth, courses, downloader, flashcards, notes
+from learnit_study import auth, courses, downloader, flashcards, notes, parser
 
 
 app = typer.Typer(help="Local-first study assistant for ITU LearnIT/Moodle.")
@@ -81,6 +81,23 @@ def course_download(
 ) -> None:
     """Placeholder for downloading course materials."""
     typer.echo(downloader.download_course(course_id=course))
+
+
+@course_app.command("inspect")
+def course_inspect(
+    course: str = typer.Option(..., "--course", help="LearnIT course id."),
+    cookie: str | None = typer.Option(
+        None,
+        "--cookie",
+        help="LearnIT browser Cookie header value. Prefer cookie.txt or LEARNIT_COOKIE.",
+    ),
+) -> None:
+    """Inspect sections and activities on a LearnIT course page."""
+    try:
+        typer.echo(parser.format_course_page(parser.inspect_course(course_id=course, cookie=cookie)))
+    except (auth.AuthError, parser.ParserError) as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
 
 
 @notes_app.command("generate")
