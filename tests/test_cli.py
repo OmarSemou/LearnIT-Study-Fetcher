@@ -22,21 +22,82 @@ def test_cli_help_loads() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "learnit" in result.output.lower()
-    assert "Command usage:" in result.output
-    assert "learnit-study auth check [--cookie TEXT]" in result.output
-    assert "learnit-study courses list" in result.output
-    assert "--classification inprogress|all|past|future" in result.output
-    assert "--include-non-courses" in result.output
-    assert "learnit-study course inspect --course TEXT [--cookie TEXT]" in result.output
-    assert "learnit-study course download --course TEXT" in result.output
-    assert "[--out TEXT]" in result.output
-    assert "[--delay FLOAT]" in result.output
-    assert "learnit-study text extract" in result.output
-    assert "[--course-dir TEXT]" in result.output
-    assert "learnit-study notes generate" in result.output
-    assert "[--no-ai] [--ai]" in result.output
-    assert "learnit-study flashcards generate --course TEXT" in result.output
+    assert "LearnIT Study Assistant" in result.output
+    assert "Common workflow:" in result.output
+    assert "Commands:" in result.output
+    assert "Command flags:" in result.output
+    assert "auth        Check LearnIT authentication" in result.output
+    assert "notes       Generate local or Gemini AI notes" in result.output
+    assert "course download" in result.output
+    assert "required: --course" in result.output
+    assert "optional: --out, --delay, --cookie" in result.output
+    assert "notes generate" in result.output
+    assert "modes: --no-ai, --ai" in result.output
+    assert "ai: --provider, --model, --detail-level, --max-materials" in result.output
+    assert "retry: --requests-per-minute, --retry-attempts, --retry-base-delay" in result.output
+    assert "safety: --overwrite, --yes" in result.output
+    assert "learnit-study <command> --help" in result.output
+    assert "[default:" not in result.output
+
+
+def test_root_help_short_alias_loads() -> None:
+    result = runner.invoke(app, ["-h"])
+
+    assert result.exit_code == 0
+    assert "LearnIT Study Assistant" in result.output
+    assert "Common workflow:" in result.output
+
+
+def test_notes_generate_help_includes_ai_options() -> None:
+    result = runner.invoke(app, ["notes", "generate", "--help"])
+
+    assert result.exit_code == 0
+    assert "Generate local notes by default" in result.output
+    assert "Input/output options" in result.output
+    assert "Local and AI mode options" in result.output
+    assert "Rate limit and retry options" in result.output
+    assert "Safety options" in result.output
+    assert "--ai" in result.output
+    assert "--provider" in result.output
+    assert "--model" in result.output
+    assert "--detail-level" in result.output
+    assert "--requests-per-minute" in result.output
+    assert "--retry-attempts" in result.output
+    assert "--retry-base-delay" in result.output
+    assert "--overwrite" in result.output
+    assert "--yes" in result.output
+    assert "learnit-study notes generate --course 3025533 --ai --max-materials 1" in result.output
+
+
+def test_notes_generate_help_short_alias_loads() -> None:
+    result = runner.invoke(app, ["notes", "generate", "-h"])
+
+    assert result.exit_code == 0
+    assert "--ai" in result.output
+
+
+def test_notes_estimate_cost_help_includes_cost_options() -> None:
+    result = runner.invoke(app, ["notes", "estimate-cost", "--help"])
+
+    assert result.exit_code == 0
+    assert "Estimate Gemini AI note generation cost" in result.output
+    assert "--provider" in result.output
+    assert "--model" in result.output
+    assert "--detail-level" in result.output
+    assert "--max-materials" in result.output
+    assert "learnit-study notes" in result.output
+    assert "estimate-cost --course 3025533" in result.output
+
+
+def test_command_specific_help_keeps_course_options() -> None:
+    result = runner.invoke(app, ["course", "download", "--help"])
+
+    assert result.exit_code == 0
+    assert "learnit-study course download --course 3025533" in result.output
+    assert "--course" in result.output
+    assert "--out" in result.output
+    assert "--delay" in result.output
+    assert "--cookie" in result.output
 
 
 def test_auth_check_command_loads(monkeypatch) -> None:

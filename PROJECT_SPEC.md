@@ -30,7 +30,9 @@ Do not copy the project blindly. Build a cleaner package structure.
 - Never log cookies or API keys.
 - Never send course material to an AI provider unless the user explicitly enables AI mode.
 - Include a README warning that the cookie is a live login credential.
-- AI note generation requires an OpenAI API key. ChatGPT Plus does not include API usage.
+- Gemini AI note generation requires `GEMINI_API_KEY`. ChatGPT Plus does not include OpenAI API usage.
+- Local notes are saved under `notes/`. AI notes are saved under `AI notes/`.
+- Gemini AI notes default to `--detail-level exam` for detailed exam preparation. `--detail-level standard` remains available for shorter notes.
 
 ## MVP
 The first version should support:
@@ -60,4 +62,5 @@ learnit-study auth check
 learnit-study courses list
 learnit-study course download --course 3022795
 learnit-study notes generate --course 3022795 --no-ai
-learnit-study notes generate --course 3022795 --ai
+learnit-study notes estimate-cost --course 3022795 --detail-level exam
+learnit-study notes generate --course 3022795 --ai --detail-level exam

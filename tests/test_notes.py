@@ -239,12 +239,13 @@ def test_cli_supports_course_dir() -> None:
     assert "Sections processed: 1" in result.output
 
 
-def test_ai_flag_gives_clear_not_implemented_message() -> None:
+def test_ai_flag_without_key_gives_clear_message(monkeypatch) -> None:
     root = local_tmp_path()
     course_dir = make_course(root)
     write_extracted(section_dir(course_dir))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    result = runner.invoke(app, ["notes", "generate", "--course-dir", str(course_dir), "--ai"])
+    result = runner.invoke(app, ["notes", "generate", "--course-dir", str(course_dir), "--ai", "--yes"])
 
     assert result.exit_code == 1
-    assert "AI note generation is not implemented yet" in result.output
+    assert "GEMINI_API_KEY is not set" in result.output

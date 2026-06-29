@@ -22,6 +22,7 @@ class NotesSummary:
     notes_generated: int
     sections_skipped: int
     failures: int
+    notes_skipped: int = 0
 
 
 STOPWORDS = {
@@ -61,9 +62,44 @@ def generate(
     out: Path | str = "output",
     ai: bool = False,
     no_ai: bool = True,
+    provider: str = "gemini",
+    model: str = "gemini-3.1-flash-lite",
+    detail_level: str = "exam",
+    max_materials: int | None = None,
+    requests_per_minute: int = 10,
+    retry_attempts: int = 3,
+    retry_base_delay: float = 10.0,
+    overwrite: bool = False,
+    progress: Any | None = None,
 ) -> NotesSummary:
     if ai:
-        raise NotesError("AI note generation is not implemented yet. Use --no-ai for local note generation.")
+        from learnit_study import ai_notes
+
+        try:
+            summary = ai_notes.generate_ai_notes(
+                course_id,
+                course_dir=course_dir,
+                out=out,
+                provider=provider,
+                model=model,
+                detail_level=detail_level,
+                max_materials=max_materials,
+                requests_per_minute=requests_per_minute,
+                retry_attempts=retry_attempts,
+                retry_base_delay=retry_base_delay,
+                overwrite=overwrite,
+                progress=progress,
+            )
+        except ai_notes.AINotesError as exc:
+            raise NotesError(str(exc)) from exc
+        return NotesSummary(
+            course_dir=summary.course_dir,
+            sections_processed=summary.sections_processed,
+            notes_generated=summary.notes_generated,
+            notes_skipped=summary.notes_skipped,
+            sections_skipped=summary.sections_skipped,
+            failures=summary.failures,
+        )
     resolved_course_dir = resolve_course_dir(course=course_id, out=out, course_dir=course_dir)
     return generate_course_notes(resolved_course_dir)
 
@@ -421,6 +457,7 @@ def format_summary(summary: NotesSummary) -> str:
             f"Generated local study notes for {summary.course_dir}.",
             f"Sections processed: {summary.sections_processed}",
             f"Notes generated: {summary.notes_generated}",
+            f"Notes skipped: {summary.notes_skipped}",
             f"Sections skipped: {summary.sections_skipped}",
             f"Failures: {summary.failures}",
         ]
