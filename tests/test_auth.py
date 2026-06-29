@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 import requests
 
 from learnit_study import auth
+
+
+def local_tmp_path() -> Path:
+    path = Path(".test_tmp") / uuid4().hex
+    path.mkdir(parents=True, exist_ok=False)
+    return path
 
 
 class FakeResponse:
@@ -29,31 +36,31 @@ class FakeSession:
         return FakeResponse(self.html)
 
 
-def test_cookie_can_be_loaded_from_environment(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.chdir(tmp_path)
+def test_cookie_can_be_loaded_from_environment(monkeypatch) -> None:
+    monkeypatch.chdir(local_tmp_path())
     monkeypatch.setenv("LEARNIT_COOKIE", "env-cookie")
 
     assert auth.load_cookie() == "env-cookie"
 
 
-def test_cookie_can_be_loaded_from_file(monkeypatch, tmp_path: Path) -> None:
+def test_cookie_can_be_loaded_from_file(monkeypatch) -> None:
     monkeypatch.delenv("LEARNIT_COOKIE", raising=False)
-    cookie_file = tmp_path / "cookie.txt"
+    cookie_file = local_tmp_path() / "cookie.txt"
     cookie_file.write_text("file-cookie", encoding="utf-8")
 
     assert auth.load_cookie(cookie_file=cookie_file) == "file-cookie"
 
 
-def test_cli_cookie_takes_priority_over_file_and_env(monkeypatch, tmp_path: Path) -> None:
+def test_cli_cookie_takes_priority_over_file_and_env(monkeypatch) -> None:
     monkeypatch.setenv("LEARNIT_COOKIE", "env-cookie")
-    cookie_file = tmp_path / "cookie.txt"
+    cookie_file = local_tmp_path() / "cookie.txt"
     cookie_file.write_text("file-cookie", encoding="utf-8")
 
     assert auth.load_cookie(cookie="cli-cookie", cookie_file=cookie_file) == "cli-cookie"
 
 
-def test_missing_cookie_gives_clear_error(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.chdir(tmp_path)
+def test_missing_cookie_gives_clear_error(monkeypatch) -> None:
+    monkeypatch.chdir(local_tmp_path())
     monkeypatch.delenv("LEARNIT_COOKIE", raising=False)
 
     with pytest.raises(auth.AuthError, match="Missing LearnIT cookie"):
@@ -66,9 +73,9 @@ def test_sesskey_is_extracted_from_valid_html() -> None:
     assert auth.extract_sesskey(html) == "abc123XYZ"
 
 
-def test_authenticate_fetches_my_page_and_finds_sesskey(monkeypatch, tmp_path: Path) -> None:
+def test_authenticate_fetches_my_page_and_finds_sesskey(monkeypatch) -> None:
     monkeypatch.delenv("LEARNIT_COOKIE", raising=False)
-    cookie_file = tmp_path / "cookie.txt"
+    cookie_file = local_tmp_path() / "cookie.txt"
     cookie_file.write_text("file-cookie", encoding="utf-8")
     session = FakeSession('<input type="hidden" name="sesskey" value="abc123">')
 
@@ -80,9 +87,9 @@ def test_authenticate_fetches_my_page_and_finds_sesskey(monkeypatch, tmp_path: P
     assert "Mozilla/5.0" in session.headers["User-Agent"]
 
 
-def test_auth_fails_cleanly_if_no_sesskey_is_found(monkeypatch, tmp_path: Path) -> None:
+def test_auth_fails_cleanly_if_no_sesskey_is_found(monkeypatch) -> None:
     monkeypatch.delenv("LEARNIT_COOKIE", raising=False)
-    cookie_file = tmp_path / "cookie.txt"
+    cookie_file = local_tmp_path() / "cookie.txt"
     cookie_file.write_text("file-cookie", encoding="utf-8")
     session = FakeSession("<html>No sesskey here</html>")
 

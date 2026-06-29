@@ -30,9 +30,49 @@ def auth_check(
 
 
 @courses_app.command("list")
-def courses_list() -> None:
-    """Placeholder for listing current LearnIT courses."""
-    typer.echo(courses.list_courses())
+def courses_list(
+    cookie: str | None = typer.Option(
+        None,
+        "--cookie",
+        help="LearnIT browser Cookie header value. Prefer cookie.txt or LEARNIT_COOKIE.",
+    ),
+    all_courses: bool = typer.Option(
+        False,
+        "--all",
+        help="Show all enrolled courses, including old courses.",
+    ),
+    classification: courses.CourseClassification | None = typer.Option(
+        None,
+        "--classification",
+        help="Advanced Moodle timeline classification. Default: inprogress.",
+    ),
+    include_non_courses: bool = typer.Option(
+        False,
+        "--include-non-courses",
+        help="Include StudyLab/non-course entries. Hidden by default.",
+    ),
+) -> None:
+    """List real LearnIT courses. Defaults to current/in-progress courses and hides StudyLab."""
+    try:
+        if all_courses and classification is not None:
+            raise courses.CourseError("Use either --all or --classification, not both.")
+        selected_classification = classification or (
+            courses.CourseClassification.ALL
+            if all_courses
+            else courses.CourseClassification.INPROGRESS
+        )
+        typer.echo(
+            courses.format_courses(
+                courses.list_courses(
+                    cookie=cookie,
+                    classification=selected_classification,
+                    include_non_courses=include_non_courses,
+                )
+            )
+        )
+    except (auth.AuthError, courses.CourseError) as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
 
 
 @course_app.command("download")
