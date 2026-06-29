@@ -74,8 +74,24 @@ def test_pdf_extraction() -> None:
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    extracted = course_dir / "Lecture 1" / "extracted_text.md"
+    extracted = course_dir / "Lecture 1" / "extracted" / "lecture.md"
     assert "PDF hello" in extracted.read_text(encoding="utf-8")
+
+
+def test_per_material_extraction_file_is_created() -> None:
+    root = local_tmp_path()
+    course_dir = make_course(root)
+    material = course_dir / "Lecture 1" / "materials" / "notes.txt"
+    material.write_text("Per material hello", encoding="utf-8")
+
+    extraction.extract_course_text(course_dir=course_dir)
+
+    extracted = course_dir / "Lecture 1" / "extracted" / "notes.md"
+    assert extracted.exists()
+    text = extracted.read_text(encoding="utf-8")
+    assert "Source filename: `notes.txt`" in text
+    assert "Original material path: `materials/notes.txt`" in text
+    assert "Per material hello" in text
 
 
 def test_docx_extraction() -> None:
@@ -87,7 +103,7 @@ def test_docx_extraction() -> None:
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    assert "DOCX hello" in (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    assert "DOCX hello" in (course_dir / "Lecture 1" / "extracted" / "reading.md").read_text(encoding="utf-8")
 
 
 def test_pptx_extraction() -> None:
@@ -101,7 +117,7 @@ def test_pptx_extraction() -> None:
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    assert "PPTX hello" in (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    assert "PPTX hello" in (course_dir / "Lecture 1" / "extracted" / "slides.md").read_text(encoding="utf-8")
 
 
 def test_html_extraction() -> None:
@@ -114,7 +130,7 @@ def test_html_extraction() -> None:
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    text = (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    text = (course_dir / "Lecture 1" / "extracted" / "page.md").read_text(encoding="utf-8")
     assert "HTML hello" in text
     assert "skip" not in text
 
@@ -130,7 +146,8 @@ def test_txt_md_and_sql_code_extraction_as_plain_text() -> None:
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    text = (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    extracted_dir = course_dir / "Lecture 1" / "extracted"
+    text = "\n".join(path.read_text(encoding="utf-8") for path in extracted_dir.glob("*.md"))
     assert "TXT hello" in text
     assert "MD hello" in text
     assert "SQL hello" in text
@@ -168,7 +185,7 @@ def test_extraction_failure_is_recorded_without_crashing(monkeypatch: pytest.Mon
     assert "boom" in manifest["extraction_failures"][0]["error"]
 
 
-def test_extracted_text_created_per_section_and_nested_materials_processed() -> None:
+def test_per_material_extraction_created_and_nested_materials_processed() -> None:
     root = local_tmp_path()
     course_dir = make_course(root)
     nested = course_dir / "Lecture 1" / "materials" / "Folder activity"
@@ -177,11 +194,21 @@ def test_extracted_text_created_per_section_and_nested_materials_processed() -> 
 
     extraction.extract_course_text(course_dir=course_dir)
 
-    extracted = course_dir / "Lecture 1" / "extracted_text.md"
+    extracted = course_dir / "Lecture 1" / "extracted" / "Folder activity - nested.md"
     text = extracted.read_text(encoding="utf-8")
     assert extracted.exists()
-    assert "## Source: materials/Folder activity/nested.txt" in text
+    assert "Original material path: `materials/Folder activity/nested.txt`" in text
     assert "Nested hello" in text
+
+
+def test_combined_extracted_text_is_not_created() -> None:
+    root = local_tmp_path()
+    course_dir = make_course(root)
+    (course_dir / "Lecture 1" / "materials" / "notes.txt").write_text("hello", encoding="utf-8")
+
+    extraction.extract_course_text(course_dir=course_dir)
+
+    assert not (course_dir / "Lecture 1" / "extracted_text.md").exists()
 
 
 def test_empty_text_is_recorded() -> None:
@@ -192,7 +219,7 @@ def test_empty_text_is_recorded() -> None:
     extraction.extract_course_text(course_dir=course_dir)
 
     manifest = read_section_manifest(course_dir)
-    text = (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    text = (course_dir / "Lecture 1" / "extracted" / "empty.md").read_text(encoding="utf-8")
     assert manifest["empty_text"][0]["path"] == "materials/empty.txt"
     assert "No extractable text found" in text
 
@@ -209,6 +236,8 @@ def test_manifest_updates() -> None:
     assert summary.sections_processed == 1
     assert top_manifest["extraction_summary"]["files_extracted"] == 1
     assert section_manifest["extracted_files"][0]["path"] == "materials/notes.txt"
+    assert section_manifest["per_material_extracted_files"][0]["extracted_path"] == "extracted/notes.md"
+    assert "combined_extracted_text_path" not in section_manifest
     assert section_manifest["extracted_at"]
 
 
@@ -221,7 +250,7 @@ def test_cli_can_find_course_folder_by_course_id_prefix() -> None:
 
     assert result.exit_code == 0
     assert "Sections processed: 1" in result.output
-    assert "CLI hello" in (course_dir / "Lecture 1" / "extracted_text.md").read_text(encoding="utf-8")
+    assert "CLI hello" in (course_dir / "Lecture 1" / "extracted" / "notes.md").read_text(encoding="utf-8")
 
 
 def test_cli_suppresses_noisy_pdf_warnings(monkeypatch: pytest.MonkeyPatch) -> None:

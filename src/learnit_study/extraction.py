@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import contextlib
 import io
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -102,7 +103,12 @@ def extract_section_text(section_dir: Path, *, extracted_at: str) -> dict[str, i
     skipped_unsupported: list[dict[str, str]] = []
     empty_text: list[dict[str, str]] = []
     extraction_failures: list[dict[str, str]] = []
-    markdown_parts = [f"# Extracted text - {section_name}", ""]
+    per_material_extracted_files: list[dict[str, str]] = []
+    extracted_dir = section_dir / "extracted"
+    extracted_dir.mkdir(exist_ok=True)
+    old_combined_path = section_dir / "extracted_text.md"
+    if old_combined_path.exists():
+        old_combined_path.unlink()
 
     for path in sorted(file for file in materials_dir.rglob("*") if file.is_file()):
         relative = path.relative_to(section_dir).as_posix()
@@ -117,23 +123,30 @@ def extract_section_text(section_dir: Path, *, extracted_at: str) -> dict[str, i
             continue
 
         text = result.text.strip()
+        per_material_path = unique_material_path(extracted_dir, path.relative_to(materials_dir))
+        per_material_path.write_text(
+            build_per_material_markdown(
+                source_name=path.name,
+                source_path=relative,
+                text=text,
+            ),
+            encoding="utf-8",
+        )
+        per_material_record = {
+            "path": relative,
+            "extractor": result.extractor,
+            "extracted_path": per_material_path.relative_to(section_dir).as_posix(),
+        }
         extracted_files.append({"path": relative, "extractor": result.extractor})
-        markdown_parts.append(f"## Source: {relative}")
-        markdown_parts.append("")
-        if text:
-            markdown_parts.append(text)
-        else:
-            markdown_parts.append("_No extractable text found._")
+        per_material_extracted_files.append(per_material_record)
+        if not text:
             empty_text.append({"path": relative, "reason": "No extractable text found"})
-        markdown_parts.append("")
-        markdown_parts.append("---")
-        markdown_parts.append("")
 
-    (section_dir / "extracted_text.md").write_text("\n".join(markdown_parts).rstrip() + "\n", encoding="utf-8")
-
+    manifest.pop("combined_extracted_text_path", None)
     manifest.update(
         {
             "extracted_files": extracted_files,
+            "per_material_extracted_files": per_material_extracted_files,
             "skipped_unsupported_files": skipped_unsupported,
             "empty_text": empty_text,
             "extraction_failures": extraction_failures,
@@ -158,6 +171,41 @@ def format_summary(summary: ExtractionSummary) -> str:
             f"Failures: {summary.files_failed}",
         ]
     )
+
+
+def build_per_material_markdown(*, source_name: str, source_path: str, text: str) -> str:
+    body = text.strip() or "_No extractable text found._"
+    return "\n".join(
+        [
+            f"# Extracted text - {source_name}",
+            "",
+            f"- Source filename: `{source_name}`",
+            f"- Original material path: `{source_path}`",
+            "",
+            body,
+            "",
+        ]
+    )
+
+
+def unique_material_path(extracted_dir: Path, material_relative_path: Path) -> Path:
+    safe_stem = safe_filename(" - ".join(material_relative_path.with_suffix("").parts))
+    candidate = extracted_dir / f"{safe_stem}.md"
+    if not candidate.exists():
+        return candidate
+    for index in range(2, 10_000):
+        numbered = extracted_dir / f"{safe_stem} ({index}).md"
+        if not numbered.exists():
+            return numbered
+    raise ExtractionError(f"Could not create unique extracted file for {material_relative_path}")
+
+
+def safe_filename(value: str, *, max_length: int = 120, fallback: str = "untitled") -> str:
+    cleaned = re.sub(r"[<>:\"/\\|?*\x00-\x1f]+", " ", value)
+    cleaned = " ".join(cleaned.split()).strip(" .")
+    if not cleaned:
+        cleaned = fallback
+    return cleaned[:max_length].rstrip(" .") or fallback
 
 
 def _update_top_manifest(course_dir: Path, extraction_summary: dict[str, Any]) -> None:

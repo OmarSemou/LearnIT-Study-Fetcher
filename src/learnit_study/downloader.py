@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import time
 from dataclasses import dataclass
@@ -17,6 +18,18 @@ from learnit_study import auth, parser
 
 SUPPORTED_FILE_TYPES = {"file", "resource"}
 SUPPORTED_TYPES = {*SUPPORTED_FILE_TYPES, "folder", "page", "url"}
+COURSE_TITLE_MAX_LENGTH = 80
+SECTION_FOLDER_MAX_LENGTH = 70
+FOLDER_ACTIVITY_FOLDER_MAX_LENGTH = 50
+MATERIAL_FILENAME_STEM_MAX_LENGTH = 80
+WINDOWS_SAFE_PART_PATH_LENGTH = 259
+SHORT_HASH_LENGTH = 6
+MIN_FOLDER_PATH_RESERVE = 20
+MIN_FILE_PART_PATH_RESERVE = 24
+SECTION_DESCENDANT_PATH_RESERVE = (
+    1 + len("materials") + 1 + MIN_FOLDER_PATH_RESERVE + 1 + MIN_FILE_PART_PATH_RESERVE
+)
+COURSE_DESCENDANT_PATH_RESERVE = 1 + 40 + SECTION_DESCENDANT_PATH_RESERVE
 
 
 class DownloadError(RuntimeError):
@@ -77,7 +90,7 @@ def download_course(
         parsed_page = parser.parse_course_page(html, course_id=course_id)
 
     resolved_course_name = course_name or parsed_page.title or f"Course {course_id}"
-    root = Path(out) / f"{safe_filename(course_id)} - {safe_filename(resolved_course_name)}"
+    root = Path(out) / _course_root_name(Path(out), course_id, resolved_course_name)
     root.mkdir(parents=True, exist_ok=True)
 
     manifest: dict[str, Any] = {
@@ -97,7 +110,12 @@ def download_course(
     links_recorded = 0
 
     for section in parsed_page.sections:
-        section_dir = root / safe_filename(section.name)
+        section_dir = root / _fit_path_component(
+            root,
+            section.name,
+            max_length=SECTION_FOLDER_MAX_LENGTH,
+            descendant_reserve=SECTION_DESCENDANT_PATH_RESERVE,
+        )
         materials_dir = section_dir / "materials"
         materials_dir.mkdir(parents=True, exist_ok=True)
         section_links: list[dict[str, str]] = []
@@ -124,10 +142,17 @@ def download_course(
                         timeout=timeout,
                     )
                 elif activity.type == "folder":
+                    folder_materials_dir = materials_dir / _fit_path_component(
+                        materials_dir,
+                        activity.name,
+                        max_length=FOLDER_ACTIVITY_FOLDER_MAX_LENGTH,
+                        descendant_reserve=1 + MIN_FILE_PART_PATH_RESERVE,
+                    )
+                    folder_materials_dir.mkdir(parents=True, exist_ok=True)
                     downloaded, skipped = _download_resource_files(
                         active_session,
                         activity=activity,
-                        target_dir=materials_dir / safe_filename(activity.name),
+                        target_dir=folder_materials_dir,
                         timeout=timeout,
                     )
                 elif activity.type == "page":
@@ -209,11 +234,128 @@ def format_summary(summary: DownloadSummary) -> str:
 
 
 def safe_filename(value: str, *, max_length: int = 120, fallback: str = "untitled") -> str:
+    cleaned = _clean_path_component(value, fallback=fallback)
+    return _shorten_component(cleaned, max_length=max_length, hash_source=value, fallback=fallback)
+
+
+def safe_material_filename(
+    value: str,
+    *,
+    stem_max_length: int = MATERIAL_FILENAME_STEM_MAX_LENGTH,
+    fallback: str = "download",
+) -> str:
+    cleaned = _clean_path_component(value, fallback=fallback)
+    suffix = Path(cleaned).suffix
+    stem = cleaned[: -len(suffix)] if suffix else cleaned
+    safe_stem = _shorten_component(
+        stem.strip(" .") or fallback,
+        max_length=stem_max_length,
+        hash_source=value,
+        fallback=fallback,
+    )
+    return f"{safe_stem}{suffix}"
+
+
+def _course_root_name(out: Path, course_id: str, course_title: str) -> str:
+    course_id_component = safe_filename(course_id)
+    available_name_length = _available_child_name_length(out, descendant_reserve=COURSE_DESCENDANT_PATH_RESERVE)
+    available_title_length = available_name_length - len(course_id_component) - len(" - ")
+    title_component = _shorten_component(
+        _clean_path_component(course_title),
+        max_length=min(COURSE_TITLE_MAX_LENGTH, max(1, available_title_length)),
+        hash_source=course_title,
+    )
+    return f"{course_id_component} - {title_component}"
+
+
+def _fit_path_component(
+    parent: Path,
+    value: str,
+    *,
+    max_length: int,
+    descendant_reserve: int,
+    fallback: str = "untitled",
+) -> str:
+    available_length = _available_child_name_length(parent, descendant_reserve=descendant_reserve)
+    return safe_filename(value, max_length=min(max_length, max(1, available_length)), fallback=fallback)
+
+
+def _available_child_name_length(parent: Path, *, descendant_reserve: int) -> int:
+    parent_length = len(str(parent.resolve()))
+    return WINDOWS_SAFE_PART_PATH_LENGTH - parent_length - 1 - descendant_reserve
+
+
+def _fit_target_to_windows_path(target: Path, *, original_filename: str) -> Path:
+    if _part_path_length(target) <= WINDOWS_SAFE_PART_PATH_LENGTH:
+        return target
+
+    parent_length = len(str(target.parent.resolve()))
+    available_filename_length = WINDOWS_SAFE_PART_PATH_LENGTH - parent_length - 1 - len(".part")
+    if available_filename_length <= 0:
+        return target
+
+    shortened_name = _material_filename_with_total_limit(
+        original_filename,
+        max_length=available_filename_length,
+    )
+    return target.with_name(shortened_name)
+
+
+def _material_filename_with_total_limit(value: str, *, max_length: int) -> str:
+    cleaned = _clean_path_component(value, fallback="download")
+    suffix = Path(cleaned).suffix
+    stem = cleaned[: -len(suffix)] if suffix else cleaned
+    stem_limit = max_length - len(suffix)
+    if stem_limit <= 0:
+        return f"{_short_hash(value)}{suffix}"
+    safe_stem = _shorten_component(
+        stem.strip(" .") or "download",
+        max_length=stem_limit,
+        hash_source=value,
+        fallback="download",
+    )
+    return f"{safe_stem}{suffix}"
+
+
+def _part_path_length(target: Path) -> int:
+    part_path = target.with_name(f"{target.name}.part")
+    return len(str(part_path.resolve()))
+
+
+def _clean_path_component(value: str, *, fallback: str = "untitled") -> str:
     cleaned = re.sub(r"[<>:\"/\\|?*\x00-\x1f]+", " ", value)
     cleaned = " ".join(cleaned.split()).strip(" .")
-    if not cleaned:
-        cleaned = fallback
-    return cleaned[:max_length].rstrip(" .") or fallback
+    return cleaned or fallback
+
+
+def _shorten_component(
+    value: str,
+    *,
+    max_length: int,
+    hash_source: str,
+    fallback: str = "untitled",
+) -> str:
+    cleaned = value.strip(" .") or fallback
+    if len(cleaned) <= max_length:
+        return cleaned
+
+    suffix = _short_hash(hash_source)
+    if max_length <= len(suffix):
+        return suffix[:max_length] or fallback
+
+    separator = "-"
+    prefix_length = max_length - len(suffix) - len(separator)
+    if prefix_length <= 0:
+        return suffix[:max_length] or fallback
+
+    prefix = cleaned[:prefix_length].rstrip(" .-")
+    if not prefix:
+        return suffix[:max_length] or fallback
+    return f"{prefix}{separator}{suffix}"
+
+
+def _short_hash(value: str) -> str:
+    return hashlib.sha1(value.encode("utf-8", errors="ignore")).hexdigest()[:SHORT_HASH_LENGTH]
 
 
 def activity_to_dict(activity: parser.Activity) -> dict[str, Any]:
@@ -254,7 +396,13 @@ def _save_page_activity(
     response = session.get(activity.url, timeout=timeout)
     response.raise_for_status()
     target_dir.mkdir(parents=True, exist_ok=True)
-    html_path = _unique_path(target_dir / f"{safe_filename(activity.name)}.html")
+    html_path = _unique_path(
+        _fit_target_to_windows_path(
+            target_dir
+            / safe_material_filename(f"{activity.name}.html", stem_max_length=MATERIAL_FILENAME_STEM_MAX_LENGTH),
+            original_filename=f"{activity.name}.html",
+        )
+    )
     html_path.write_text(_main_page_html(response.text), encoding="utf-8")
     downloaded = [
         {
@@ -301,18 +449,33 @@ def _download_file(
     target_dir.mkdir(parents=True, exist_ok=True)
     response = session.get(url, timeout=timeout, stream=True)
     response.raise_for_status()
-    filename = safe_filename(_filename_from_response(url, response.headers.get("content-disposition")))
+    original_filename = _filename_from_response(url, response.headers.get("content-disposition"))
+    filename = safe_material_filename(original_filename, stem_max_length=MATERIAL_FILENAME_STEM_MAX_LENGTH)
     target = target_dir / filename
+    target = _fit_target_to_windows_path(target, original_filename=original_filename)
     if target.exists() and target.stat().st_size > 0:
-        return {"url": url, "path": str(target), "status": "skipped"}
+        record = {"url": url, "path": str(target), "status": "skipped"}
+        if target.name != _clean_path_component(original_filename):
+            record["original_filename"] = original_filename
+            record["saved_filename"] = target.name
+        return record
 
-    part = target.with_name(f"{target.name}.part")
-    with part.open("wb") as handle:
-        for chunk in response.iter_content(chunk_size=1024 * 64):
-            if chunk:
-                handle.write(chunk)
-    part.replace(target)
-    return {"url": url, "path": str(target), "status": "downloaded"}
+    part_path = target.with_name(f"{target.name}.part")
+    try:
+        part_path.parent.mkdir(parents=True, exist_ok=True)
+        with part_path.open("wb") as handle:
+            for chunk in response.iter_content(chunk_size=1024 * 64):
+                if chunk:
+                    handle.write(chunk)
+        part_path.replace(target)
+    except Exception:
+        part_path.unlink(missing_ok=True)
+        raise
+    record = {"url": url, "path": str(target), "status": "downloaded"}
+    if target.name != _clean_path_component(original_filename):
+        record["original_filename"] = original_filename
+        record["saved_filename"] = target.name
+    return record
 
 
 def _pluginfile_links(html: str, base_url: str) -> list[str]:

@@ -5,7 +5,42 @@ import typer
 from learnit_study import auth, courses, downloader, extraction, flashcards, notes, parser
 
 
-app = typer.Typer(help="Local-first study assistant for ITU LearnIT/Moodle.")
+COMMAND_REFERENCE = """
+Command usage:
+
+  learnit-study auth check [--cookie TEXT]
+    Check whether a LearnIT browser cookie is available and valid.
+
+  learnit-study courses list [--cookie TEXT] [--all]
+                            [--classification inprogress|all|past|future]
+                            [--include-non-courses]
+    List current real courses by default. Use --all for historical courses.
+
+  learnit-study course inspect --course TEXT [--cookie TEXT]
+    Fetch and print the LearnIT course section/activity structure.
+
+  learnit-study course download --course TEXT [--out TEXT] [--delay FLOAT]
+                                [--cookie TEXT]
+    Download supported course materials into the local output folder.
+
+  learnit-study text extract [--course TEXT] [--out TEXT] [--course-dir TEXT]
+    Extract text from already-downloaded local course materials.
+
+  learnit-study notes generate [--course TEXT] [--out TEXT] [--course-dir TEXT]
+                               [--no-ai] [--ai]
+    Generate local per-material study notes from extracted text.
+
+  learnit-study flashcards generate --course TEXT
+    Placeholder for future flashcard generation.
+
+Use '<command> --help' for detailed option descriptions.
+""".strip()
+
+
+app = typer.Typer(
+    help="Local-first study assistant for ITU LearnIT/Moodle.",
+    epilog=COMMAND_REFERENCE,
+)
 auth_app = typer.Typer(help="Authentication helpers.")
 courses_app = typer.Typer(help="List LearnIT courses.")
 course_app = typer.Typer(help="Work with a selected LearnIT course.")
@@ -130,12 +165,19 @@ def text_extract(
 
 @notes_app.command("generate")
 def notes_generate(
-    course: str = typer.Option(..., "--course", help="LearnIT course id."),
+    course: str | None = typer.Option(None, "--course", help="LearnIT course id."),
+    out: str = typer.Option("output", "--out", help="Output directory containing downloaded courses."),
+    course_dir: str | None = typer.Option(None, "--course-dir", help="Exact downloaded course folder."),
     ai: bool = typer.Option(False, "--ai", help="Future option for explicit AI mode."),
-    no_ai: bool = typer.Option(False, "--no-ai", help="Future option for local-only mode."),
+    no_ai: bool = typer.Option(True, "--no-ai", help="Use local non-AI note generation."),
 ) -> None:
-    """Placeholder for generating study notes."""
-    typer.echo(notes.generate(course_id=course, ai=ai, no_ai=no_ai))
+    """Generate local study notes from per-material extracted files."""
+    try:
+        summary = notes.generate(course_id=course, course_dir=course_dir, out=out, ai=ai, no_ai=no_ai)
+        typer.echo(notes.format_summary(summary))
+    except notes.NotesError as exc:
+        typer.secho(str(exc), err=True, fg=typer.colors.RED)
+        raise typer.Exit(1) from exc
 
 
 @flashcards_app.command("generate")

@@ -23,6 +23,20 @@ def test_cli_help_loads() -> None:
 
     assert result.exit_code == 0
     assert "learnit" in result.output.lower()
+    assert "Command usage:" in result.output
+    assert "learnit-study auth check [--cookie TEXT]" in result.output
+    assert "learnit-study courses list" in result.output
+    assert "--classification inprogress|all|past|future" in result.output
+    assert "--include-non-courses" in result.output
+    assert "learnit-study course inspect --course TEXT [--cookie TEXT]" in result.output
+    assert "learnit-study course download --course TEXT" in result.output
+    assert "[--out TEXT]" in result.output
+    assert "[--delay FLOAT]" in result.output
+    assert "learnit-study text extract" in result.output
+    assert "[--course-dir TEXT]" in result.output
+    assert "learnit-study notes generate" in result.output
+    assert "[--no-ai] [--ai]" in result.output
+    assert "learnit-study flashcards generate --course TEXT" in result.output
 
 
 def test_auth_check_command_loads(monkeypatch) -> None:

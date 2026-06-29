@@ -1,7 +1,7 @@
 # LearnIT Study Assistant
 
 ## Goal
-Build a local-first Python tool that logs into LearnIT using the student's own browser session cookie, lists their current courses, downloads uploaded course material, groups it by LearnIT section/week, extracts text from the material, and generates study notes for each lecture/section.
+Build a local-first Python tool that logs into LearnIT using the student's own browser session cookie, lists their current courses, downloads uploaded course material, groups it by LearnIT section/week, extracts text from each material, and generates study notes for each material.
 
 ## Reference repo
 Use https://github.com/alexop1000/learnit-backup as inspiration/reference only.
@@ -41,7 +41,7 @@ The first version should support:
 5. Parsing course sections/weeks.
 6. Downloading materials from resources, folders, and pages.
 7. Extracting text from PDF, DOCX, PPTX, HTML, TXT, and Markdown.
-8. Generating one notes.md file per section.
+8. Generating local notes per downloaded material.
 9. Saving everything locally.
 
 ## Not in MVP
