@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}LearnIT Study Assistant{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">LearnIT Study Assistant</a>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/courses">Courses</a>
+        {% if password_protection_enabled() and request.session.get("web_authenticated") %}
+        <form class="logout-form" method="post" action="/logout">
+          <button type="submit">Logout</button>
+        </form>
+        {% elif password_protection_enabled() %}
+        <a href="/login">Login</a>
+        {% endif %}
+      </nav>
+    </header>
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

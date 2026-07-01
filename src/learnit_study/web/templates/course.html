@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Course {{ course_id }} - LearnIT Study Assistant{% endblock %}
+{% block content %}
+<h1>Course {{ course_id }}</h1>
+<p>Output directory: <code>{{ output_dir }}</code></p>
+{% if not has_cookie %}
+<p class="warning">No LearnIT cookie is available in this browser session. Downloading and inspection require authentication.</p>
+{% endif %}
+
+{% if estimate %}
+<section class="panel">
+  <h2>Gemini cost estimate</h2>
+  <pre>{{ estimate }}</pre>
+</section>
+{% endif %}
+
+<section class="actions-grid">
+  <form method="post" action="/course/{{ course_id }}/inspect" class="action-card">
+    <h2>Inspect course structure</h2>
+    <p>Fetch and parse LearnIT sections, lectures, and activities.</p>
+    <button type="submit">Inspect</button>
+  </form>
+
+  <form method="post" action="/course/{{ course_id }}/download" class="action-card">
+    <h2>Download materials</h2>
+    <p>Download supported files, folders, pages, and links.</p>
+    <button type="submit">Download</button>
+  </form>
+
+  <form method="post" action="/course/{{ course_id }}/extract" class="action-card">
+    <h2>Extract text</h2>
+    <p>Extract text from already-downloaded local files.</p>
+    <button type="submit">Extract</button>
+  </form>
+
+  <form method="post" action="/course/{{ course_id }}/notes/local" class="action-card">
+    <h2>Generate local notes</h2>
+    <p>Create local/free per-material notes under <code>notes/</code>.</p>
+    <button type="submit">Generate local notes</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Gemini AI notes</h2>
+  <p class="warning">AI mode sends extracted course text to Gemini. Use your own course materials only.</p>
+  <form method="post" action="/course/{{ course_id }}/notes/ai/estimate" class="stacked-form">
+    <label>Model <input name="model" value="gemini-3.1-flash-lite"></label>
+    <label>Detail level <input name="detail_level" value="exam"></label>
+    <label>Max materials for estimate <input name="max_materials" placeholder="blank = all"></label>
+    <button type="submit">Estimate Gemini cost</button>
+  </form>
+
+  <form method="post" action="/course/{{ course_id }}/notes/ai/generate" class="stacked-form">
+    <label>Model <input name="model" value="gemini-3.1-flash-lite"></label>
+    <label>Detail level <input name="detail_level" value="exam"></label>
+    <label>Max materials <input name="max_materials" value="1"></label>
+    <label>Requests per minute <input name="requests_per_minute" value="10" type="number" min="1"></label>
+    <button type="submit">Generate Gemini notes for max 1 material</button>
+  </form>
+
+  <form method="post" action="/course/{{ course_id }}/notes/ai/generate" class="stacked-form danger-zone">
+    <input type="hidden" name="max_materials" value="">
+    <label>Model <input name="model" value="gemini-3.1-flash-lite"></label>
+    <label>Detail level <input name="detail_level" value="exam"></label>
+    <label>Requests per minute <input name="requests_per_minute" value="10" type="number" min="1"></label>
+    <label><input type="checkbox" name="confirm_full" value="yes"> I understand full-course AI generation can take time and sends extracted text to Gemini.</label>
+    <button type="submit">Generate Gemini notes for full course</button>
+  </form>
+</section>
+
+<section>
+  <h2>View notes</h2>
+  <a class="button-link" href="/course/{{ course_id }}/notes">Open notes viewer</a>
+</section>
+{% endblock %}

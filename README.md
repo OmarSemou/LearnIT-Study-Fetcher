@@ -132,6 +132,195 @@ learnit-study notes generate --course 3025533 --ai --requests-per-minute 10
 Use `--max-materials 1` first as a small real-world test before generating AI
 notes for a full course.
 
+## Web MVP
+
+The project also includes a small FastAPI web MVP around the existing CLI/core
+logic. It is intended for a single-user personal deployment, for example on
+Render. The CLI remains fully supported.
+
+The web app reuses the same backend modules as the CLI:
+
+- `auth`
+- `courses`
+- `parser`
+- `downloader`
+- `extraction`
+- `notes`
+- `ai_notes`
+
+It does not add user accounts, a database, payments, background queues, public
+sharing, or a React frontend.
+
+### Run Locally
+
+Install dependencies:
+
+```powershell
+python -m pip install -e ".[dev]"
+```
+
+Run the web app:
+
+```powershell
+uvicorn learnit_study.web.app:app --reload
+```
+
+Open:
+
+```txt
+http://127.0.0.1:8000
+```
+
+The web app defaults to `output/` locally. Override it with:
+
+```powershell
+$env:LEARNIT_OUTPUT_DIR = "output"
+```
+
+For Gemini AI notes, set:
+
+```powershell
+$env:GEMINI_API_KEY = "your-api-key"
+```
+
+Local password protection is optional. If you want to test the login flow:
+
+```powershell
+$env:LEARNIT_WEB_PASSWORD = "choose-a-local-password"
+$env:LEARNIT_WEB_SECRET_KEY = "choose-a-long-random-local-secret"
+uvicorn learnit_study.web.app:app --reload
+```
+
+If `LEARNIT_WEB_PASSWORD` is not set, local development runs without login.
+
+### Web Routes
+
+| Route | Method | Purpose |
+| --- | --- | --- |
+| `/login` | `GET` | Shows the single-user login form when password protection is enabled. |
+| `/login` | `POST` | Checks `LEARNIT_WEB_PASSWORD` and stores only an authenticated boolean in the session. |
+| `/logout` | `POST` | Clears the web session. |
+| `/` | `GET` | Home page, privacy warning, LearnIT cookie form. |
+| `/auth/check` | `POST` | Checks the pasted LearnIT cookie. The cookie is not shown back to the user. |
+| `/courses` | `GET` | Lists current courses using the active temporary web session. |
+| `/course/{course_id}` | `GET` | Shows course actions. |
+| `/course/{course_id}/inspect` | `POST` | Starts an inspect job. |
+| `/course/{course_id}/download` | `POST` | Starts a download job. |
+| `/course/{course_id}/extract` | `POST` | Starts a text extraction job. |
+| `/course/{course_id}/notes/local` | `POST` | Starts local note generation. |
+| `/course/{course_id}/notes/ai/estimate` | `POST` | Shows Gemini cost estimate. |
+| `/course/{course_id}/notes/ai/generate` | `POST` | Starts Gemini AI note generation. |
+| `/jobs/{job_id}` | `GET` | Shows in-memory job status and summary. |
+| `/course/{course_id}/notes` | `GET` | Lists and displays generated local/AI notes as escaped text. |
+
+### Web Cookie Behavior
+
+If `LEARNIT_WEB_PASSWORD` is set, all app pages except `/login` and static
+assets require login. Static CSS remains public. Login success stores only a
+boolean in the signed session, never the password.
+
+For the MVP, the user pastes a LearnIT browser cookie into the web form. The
+server stores it only in an in-memory dictionary keyed by a temporary browser
+session cookie. This avoids writing the LearnIT cookie to disk, manifests, or
+the repo.
+
+Important limitations:
+
+- In-memory cookies disappear when the server restarts.
+- This is not a production multi-user authentication system.
+- Only use your own LearnIT account/session.
+- Do not deploy this as an open public SaaS.
+
+### Web Jobs
+
+Long actions run through a simple in-memory thread job runner:
+
+- course inspection
+- downloads
+- text extraction
+- local note generation
+- Gemini AI note generation
+
+The job page shows status, summary counts, result text, and failures.
+
+Important limitations:
+
+- Jobs disappear when the server restarts.
+- Render free instances can restart or sleep.
+- This MVP does not use Celery, Redis, or a database.
+- Local files on Render free services may disappear after restart unless you
+  configure persistent storage.
+
+### Render Deployment
+
+This repo includes `render.yaml`.
+
+Suggested Render settings:
+
+```yaml
+services:
+  - type: web
+    name: learnit-study
+    env: python
+    buildCommand: pip install -e ".[dev]"
+    startCommand: uvicorn learnit_study.web.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LEARNIT_OUTPUT_DIR
+        value: /tmp/learnit-output
+      - key: LEARNIT_WEB_PASSWORD
+        sync: false
+      - key: LEARNIT_WEB_SECRET_KEY
+        sync: false
+```
+
+Render environment variables:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Only for AI notes | Server-side Gemini API key. Configure it in the Render dashboard. Do not enter it in the web UI. |
+| `LEARNIT_OUTPUT_DIR` | Recommended on Render | Use `/tmp/learnit-output` unless you configure persistent storage. |
+| `LEARNIT_WEB_PASSWORD` | Yes for Render | Single-user password required before anyone can use the web app. Use a strong unique password. |
+| `LEARNIT_WEB_SECRET_KEY` | Yes for Render | Long random secret used to sign browser sessions. Do not reuse the web password. |
+| `LEARNIT_WEB_WORKERS` | No | Number of in-memory worker threads. Default: `2`. |
+
+Render notes:
+
+- The service must bind to `0.0.0.0`.
+- Render provides `$PORT`; the start command uses it.
+- Set `LEARNIT_WEB_PASSWORD` before exposing the service. Without it, the web
+  app is open to anyone who can reach the URL.
+- Set `LEARNIT_WEB_SECRET_KEY` to a long random value. If password protection is
+  enabled on Render and the secret is missing, startup fails clearly.
+- `/tmp/learnit-output` is suitable for the MVP but is not durable permanent
+  storage.
+- Add a persistent disk later if you want files to survive restarts.
+
+### Safe And Unsafe In The Web MVP
+
+Safer:
+
+- Uses existing tested core logic.
+- Does not write LearnIT cookies to output manifests.
+- Does not ask for Gemini API keys in the browser.
+- Supports single-user password protection with `LEARNIT_WEB_PASSWORD`.
+- Shows notes as escaped text instead of unsafe rendered HTML.
+- Keeps local notes and AI notes in separate folders.
+
+Unsafe or not production-ready:
+
+- No user accounts.
+- No database.
+- No durable job queue.
+- In-memory sessions and jobs vanish on restart.
+- Pasted LearnIT cookies are live credentials.
+- Password protection is simple single-user protection, not a complete identity
+  or authorization system.
+- A public deployment should be treated as a personal/single-user app only.
+- Downloaded course materials may exist on the server filesystem while the app
+  is running.
+
 ## Output Folder Structure
 
 Downloaded and generated files are saved under `output/` by default.

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} - LearnIT Study Assistant{% endblock %}
+{% block content %}
+<h1>{{ job.title }}</h1>
+<dl class="metadata">
+  <dt>Status</dt>
+  <dd><span class="status status-{{ job.status }}">{{ job.status }}</span></dd>
+  <dt>Created</dt>
+  <dd>{{ job.created_at }}</dd>
+  <dt>Updated</dt>
+  <dd>{{ job.updated_at }}</dd>
+</dl>
+
+{% if job.status in ["queued", "running"] %}
+<p>This job is still running. Refresh this page to check progress.</p>
+<meta http-equiv="refresh" content="3">
+{% endif %}
+
+{% if job.result_data %}
+<section class="panel">
+  <h2>Summary counts</h2>
+  <table>
+    <tbody>
+      {% for key, value in job.result_data.items() %}
+      <tr><th>{{ key }}</th><td>{{ value }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if job.result_text %}
+<section class="panel">
+  <h2>Result</h2>
+  <pre>{{ job.result_text }}</pre>
+</section>
+{% endif %}
+
+{% if job.error %}
+<section class="panel error-box">
+  <h2>Failure</h2>
+  <pre>{{ job.error }}</pre>
+</section>
+{% endif %}
+{% endblock %}

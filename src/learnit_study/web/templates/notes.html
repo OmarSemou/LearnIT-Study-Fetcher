@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Notes - Course {{ course_id }}{% endblock %}
+{% block content %}
+<h1>Notes for course {{ course_id }}</h1>
+<p>Course folder: <code>{{ course_dir }}</code></p>
+
+{% if notes %}
+<div class="notes-layout">
+  <aside class="notes-list">
+    <h2>Note files</h2>
+    {% for note in notes %}
+    <a class="note-link {% if selected and selected.relative_path == note.relative_path %}active{% endif %}" href="/course/{{ course_id }}/notes?note={{ note.relative_path | urlencode }}">
+      <span>{{ note.kind }}</span>
+      <strong>{{ note.name }}</strong>
+      <small>{{ note.section }}</small>
+    </a>
+    {% endfor %}
+  </aside>
+  <section class="note-content">
+    {% if selected %}
+    <h2>{{ selected.name }}</h2>
+    <p><span class="badge">{{ selected.kind }}</span> {{ selected.section }}</p>
+    <pre>{{ content }}</pre>
+    {% else %}
+    <p>Select a note file to view it. Markdown is shown as escaped text for safety in this MVP.</p>
+    {% endif %}
+  </section>
+</div>
+{% else %}
+<p>No local or AI notes were found. Generate notes first.</p>
+{% endif %}
+{% endblock %}

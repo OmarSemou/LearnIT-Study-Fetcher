@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Courses - LearnIT Study Assistant{% endblock %}
+{% block content %}
+<h1>Courses</h1>
+{% if auth_ok %}
+<p class="success">Authentication succeeded. Your cookie was accepted for this active session.</p>
+{% endif %}
+
+<form method="get" action="/courses" class="inline-form">
+  <label>
+    <input type="checkbox" name="include_non_courses" value="true" {% if include_non_courses %}checked{% endif %}>
+    Include StudyLab/non-course entries
+  </label>
+  <button type="submit">Refresh courses</button>
+</form>
+
+{% if courses %}
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Short name</th>
+      <th>Full name</th>
+      <th>Start date</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for course in courses %}
+    <tr>
+      <td>{{ course.id }}</td>
+      <td>{{ course.shortname }}</td>
+      <td>{{ course.fullname }}</td>
+      <td>{{ course.startdate or "" }}</td>
+      <td><a class="button-link" href="/course/{{ course.id }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No current LearnIT courses found.</p>
+{% endif %}
+{% endblock %}

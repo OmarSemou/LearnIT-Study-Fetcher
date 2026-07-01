@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}LearnIT Study Assistant{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>LearnIT Study Assistant</h1>
+  <p>Download LearnIT course materials, extract text, and generate local or Gemini AI study notes.</p>
+</section>
+
+<section class="notice">
+  <h2>Privacy first</h2>
+  <p>Your LearnIT cookie is a live login credential. Only use your own LearnIT account/session. The web MVP keeps the cookie only for this active browser/server session and never shows it back.</p>
+  <p>Gemini AI notes send extracted text to Gemini only when you explicitly choose AI generation.</p>
+</section>
+
+<section class="panel">
+  <h2>Check LearnIT authentication</h2>
+  <form method="post" action="/auth/check">
+    <label for="learnit_cookie">LearnIT cookie</label>
+    <textarea id="learnit_cookie" name="learnit_cookie" rows="5" required placeholder="Paste your LearnIT Cookie header here"></textarea>
+    <button type="submit">Check authentication</button>
+  </form>
+</section>
+
+<section>
+  <h2>Typical workflow</h2>
+  <ol class="workflow">
+    <li>Check authentication.</li>
+    <li>List courses.</li>
+    <li>Open a course page.</li>
+    <li>Download materials.</li>
+    <li>Extract text.</li>
+    <li>Generate local or AI notes.</li>
+  </ol>
+</section>
+{% endblock %}
